@@ -27,6 +27,7 @@ class ViewController: UIViewController {
         let url = URL(string: "https://bitdash-a.akamaihd.net/content/MI201109210084_1/m3u8s/f08e80da-bf1d-4e3d-8899-f0f6155f6efa.m3u8")!
         player = AVPlayer(url: url)
         player.currentItem?.addObserver(self, forKeyPath: "duration", options: [.new, .initial], context: nil)
+        addTimeObserver()
         playerLayer = AVPlayerLayer(player: player)
         playerLayer.videoGravity = .resize
         
@@ -46,6 +47,10 @@ class ViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         player.play()
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        player.currentItem?.removeObserver(self, forKeyPath: "duration")
     }
 
 
@@ -80,12 +85,25 @@ class ViewController: UIViewController {
         player.seek(to: time)
     }
     @IBAction func sliderValueChanged(_ sender: UISlider) {
+        player.seek(to: CMTimeMake(Int64(sender.value*1000), 1000))
     }
     
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         if keyPath == "duration", let duration = player.currentItem?.duration.seconds, duration > 0.0 {
-            
+            self.durationLabel.text = getTimeString(from: player.currentItem!.duration)
         }
+    }
+    
+    func addTimeObserver() {
+        let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        let mainQueue = DispatchQueue.main
+        _ = player.addPeriodicTimeObserver(forInterval: interval, queue: mainQueue, using: { [weak self] time in
+            guard let currentItem = self?.player.currentItem else { return }
+            self?.timeSlider.maximumValue = Float(currentItem.duration.seconds)
+            self?.timeSlider.minimumValue = 0
+            self?.timeSlider.value = Float(currentItem.currentTime().seconds)
+            self?.currentTimeLabel.text = self?.getTimeString(from: currentItem.currentTime())
+        })
     }
     
     func getTimeString(from time: CMTime) -> String {
